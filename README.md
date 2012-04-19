@@ -1,4 +1,0 @@
-apyclient
-=========
-
-Python Api Client
