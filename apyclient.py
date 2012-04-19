@@ -1,3 +1,18 @@
+# apyclient.py
+# A python client api library.
+# Copyright (C) 2012 Aaron Madison
+
+# Released subject to the BSD License
+
+
+__all__ = (
+    'api_request',
+    'BaseResponse',
+    'JSONApiResponse',
+)
+
+__version__ = "0.0.1"
+
 
 from functools import wraps
 import json

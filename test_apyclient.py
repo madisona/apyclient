@@ -6,7 +6,7 @@ from unittest import TestCase, main
 import urllib2
 
 
-import api
+import apyclient
 
 __all__ = (
     'BaseResponseTests',
@@ -35,15 +35,15 @@ class ResponseStub(object):
 class ApiStub(object):
     HOST_NAME = "http://www.example.com"
 
-    @api.api_request("/do-something/", timeout=10)
+    @apyclient.api_request("/do-something/", timeout=10)
     def do_something(self):
         return {'times': 5}
 
-    @api.api_request("/do-multiple/", timeout=3)
+    @apyclient.api_request("/do-multiple/", timeout=3)
     def do_multiple(self):
         return {'times': [5, 3]}
 
-    @api.api_request("/do-post/", method="POST", timeout=30)
+    @apyclient.api_request("/do-post/", method="POST", timeout=30)
     def do_post(self):
         return {
             'one_thing': "this&that",
@@ -54,7 +54,7 @@ class ApiStub(object):
 class ApiCustomResponseStub(ApiStub):
     RESPONSE_CLASS = CustomResponseTwo
 
-    @api.api_request("/do-custom/", response_class=CustomResponse)
+    @apyclient.api_request("/do-custom/", response_class=CustomResponse)
     def do_custom(self):
         return {}
 
@@ -63,18 +63,18 @@ class BaseResponseTests(TestCase):
 
     def test_status_code(self):
         r = ResponseStub(code=200)
-        response = api.BaseResponse(r)
+        response = apyclient.BaseResponse(r)
         self.assertEqual(200, response.code)
 
     def test_is_success(self):
         r = ResponseStub(code=200)
-        response = api.BaseResponse(r)
+        response = apyclient.BaseResponse(r)
         self.assertEqual(True, response.is_success)
 
     def test_not_success(self):
-        redirect = api.BaseResponse(ResponseStub(code=301))
-        bad_request = api.BaseResponse(ResponseStub(code=400))
-        server_error = api.BaseResponse(ResponseStub(code=500))
+        redirect = apyclient.BaseResponse(ResponseStub(code=301))
+        bad_request = apyclient.BaseResponse(ResponseStub(code=400))
+        server_error = apyclient.BaseResponse(ResponseStub(code=500))
 
         self.assertEqual(False, redirect.is_success)
         self.assertEqual(False, bad_request.is_success)
@@ -82,13 +82,13 @@ class BaseResponseTests(TestCase):
 
     def test_returns_content(self):
         raw = ResponseStub(code=200, content="This is my content")
-        response = api.BaseResponse(raw)
+        response = apyclient.BaseResponse(raw)
 
         self.assertEqual(raw.content, response.content)
 
     def test_caches_response_content(self):
         raw = ResponseStub(code=200, content="This is my content")
-        response = api.BaseResponse(raw)
+        response = apyclient.BaseResponse(raw)
 
         with mock.patch.object(raw, 'read') as read:
             c = response.content
@@ -169,14 +169,14 @@ class JSONApiResponseTests(TestCase):
     def test_loads_json_from_content(self):
         data = self.get_data()
         raw = ResponseStub(code=200, content=json.dumps(data))
-        response = api.JSONApiResponse(raw)
+        response = apyclient.JSONApiResponse(raw)
 
         self.assertEqual(data, response.json())
 
     def test_caches_json_response(self):
         data = self.get_data()
         raw = ResponseStub(code=200, content=json.dumps(data))
-        response = api.JSONApiResponse(raw)
+        response = apyclient.JSONApiResponse(raw)
 
         with mock.patch('json.loads') as load:
             load.return_value = data
@@ -184,10 +184,6 @@ class JSONApiResponseTests(TestCase):
             two = response.json()
         self.assertEqual(two, one)
         self.assertEqual(1, load.call_count)
-
-
-
-
 
 
 if __name__ == '__main__':
