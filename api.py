@@ -1,65 +1,104 @@
 
-import json
 from functools import wraps
+import json
 import socket
 from urllib import urlencode
-from urllib2 import urlopen, HTTPError
+import urllib2
 
-def api_request(endpoint, method="GET", response_type="json", timeout=socket._GLOBAL_DEFAULT_TIMEOUT):
+
+class BaseResponse(object):
     """
-    Class method wrapper
+    Thin wrapper around response that comes back from urlopen.
+    Mainly just so you can easily extend the response if desired.
+
+    Note that this response is not EXACTLY like a response you'd normally
+    get from urlopen. It cannot be used as a drop in replacement.
     """
-    # todo: enhance to allow post method
+    _content = None
+
+    def __init__(self, response):
+        self.original_response = response
+
+    @property
+    def code(self):
+        return self.original_response.code
+
+    @property
+    def is_success(self):
+        # According to RFC 2616, "2xx" code indicates that the client's
+        # request was successfully received, understood, and accepted.
+        return self.code // 100 == 2
+
+    @property
+    def content(self):
+        """
+        Returns raw response content.
+        """
+        if self._content is None:
+            self._content = self.original_response.read()
+        return self._content
+
+
+def api_request(endpoint, method="GET", timeout=socket._GLOBAL_DEFAULT_TIMEOUT, response_class=None):
+    """
+    Decorator to turn method into api call.
+    Assumes parent class has "HOST_NAME" defined.
+
+    Check tests / docs for usage.
+
+    :param endpoint:
+        URL endpoint for request.
+
+    :param method:
+        HTTP method for request.
+
+    :param timeout:
+        Timeout in seconds.
+
+    :param response_class:
+        Response class to wrap response in. If not provided will use standard response from urlopen,
+        or standard HttpError if received.
+    """
 
     def _outter(func):
         @wraps(func)
         def _inner(cls, *args, **kwargs):
             try:
-                data = func(cls, *args, **kwargs)
-                url = cls.BASE_URL + endpoint + "?" + urlencode(data)
-                r = urlopen(url, timeout=10)
-                return json.loads(r.read())
-            except HTTPError as e:
+                url = cls.HOST_NAME + endpoint
+                func_data = func(cls, *args, **kwargs)
+                query_data = urlencode(func_data, doseq=1)
+                if method == "GET":
+                    url += "?" + query_data
+                    query_data = None
 
-                # todo: log error
-                return {}
+                response = urllib2.urlopen(url, data=query_data, timeout=timeout)
+            except urllib2.HTTPError as e:
+                response = e
+
+            custom_response = response_class or getattr(cls, "RESPONSE_CLASS", None)
+            if custom_response:
+                return custom_response(response)
+            else:
+                return response
         return _inner
     return _outter
 
 
-class JSONApiResponse(object):
-    """
-    Thin wrapper for Response from urllib.
 
-
+class JSONApiResponse(BaseResponse):
     """
-    _content = None
+    Loads JSON object from Response.
+
+    You still need to be careful that the response is a json string in the
+    first place (you didn't get some crazy non-json error)
+    """
     _json = None
 
-    def __init__(self, response=None):
-        self._response = response
+    def json(self):
+        if self._json is None:
+            self._json = json.loads(self.content)
+        return self._json
 
-    def __getattr__(self, item):
-        """
-        Allows you to get attributes straight from json response.
-        (pass through to json response's get item)
-        """
 
-    @property
-    def is_success(self):
-        """
-        Not error and response status code // 100 == 2
-        """
-
-    @property
-    def status_code(self):
-        pass
-
-    @property
-    def content(self):
-        """
-        return response body. Cache it
-        """
-        pass
 
 
