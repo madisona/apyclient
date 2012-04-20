@@ -7,7 +7,6 @@ LONG_DESCRIPTION = open(readme, 'r').read()
 params = dict(
     name='apyclient',
     version='0.0.1',
-    packages=[''],
     url='https://github.com/madisona/apyclient',
     license='BSD',
     author='Aaron Madison',

@@ -1,0 +1,3 @@
+
+include README.rst LICENSE test_apyclient.py
+

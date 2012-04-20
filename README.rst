@@ -1,7 +1,7 @@
 apyclient
 =========
 
-A Python Api Client
+A Python API Client
 
 Overview
 --------
@@ -22,13 +22,13 @@ Usage
 -----
 
 You are able to easily create a client Api class. The only requirement of
-the Api class is that it must have a "HOST_NAME" attribute declared. The API
+the API class is that it must have a "HOST_NAME" attribute declared. The API
 uses this host name to prepend to the endpoint when building the request.
 
 ::
 
-    class MyApiClient(object):
-        HOST_NAME = "http://www.example.com/api
+    class MyAPIClient(object):
+        HOST_NAME = "http://www.example.com"
 
         @api_request("/api-endpoint/")
         def fetch_some_stuff(some_var):
@@ -37,7 +37,7 @@ uses this host name to prepend to the endpoint when building the request.
     my_client = MyApiClient()
     my_client.fetch_some_stuff(3)
 
-And that's it. The client will make an Http GET request by default with the
+And that's it. The client will make an HTTP GET request by default with the
 data provided by the decorated method.
 
 You can also do a POST request by declaring ``method="POST"`` in the api_request.
