@@ -39,6 +39,10 @@ class ApiStub(object):
     def do_something(self):
         return {'times': 5}
 
+    @apyclient.api_request("/do-simple/", timeout=10)
+    def do_simple(self):
+        pass
+
     @apyclient.api_request("/do-multiple/", timeout=3)
     def do_multiple(self):
         return {'times': [5, 3]}
@@ -120,6 +124,16 @@ class ApiRequestTests(TestCase):
         urlopen.assert_called_once_with("http://www.example.com/do-post/",
             data="one_thing=this%26that&other_thing=a%2Fpath", # url encoded
             timeout=30,
+        )
+
+    @mock.patch("urllib2.urlopen")
+    def test_makes_correct_call_when_no_data_to_pass(self, urlopen):
+        api = ApiStub()
+        api.do_simple()
+
+        urlopen.assert_called_once_with("http://www.example.com/do-simple/",
+            data=None,
+            timeout=10,
         )
 
     @mock.patch("urllib2.urlopen")

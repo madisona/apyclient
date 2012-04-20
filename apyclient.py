@@ -54,49 +54,83 @@ class BaseResponse(object):
         return self._content
 
 
-def api_request(endpoint, method="GET", timeout=socket._GLOBAL_DEFAULT_TIMEOUT, response_class=None):
+class APIRequest(object):
     """
-    Decorator to turn method into api call.
+    API method decorator to turn method into easy API call.
     Assumes parent class has "HOST_NAME" defined.
-
-    Check tests / docs for usage.
-
-    :param endpoint:
-        URL endpoint for request.
-
-    :param method:
-        HTTP method for request.
-
-    :param timeout:
-        Timeout in seconds.
-
-    :param response_class:
-        Response class to wrap response in. If not provided will use standard response from urlopen,
-        or standard HttpError if received.
     """
 
-    def _outter(func):
-        @wraps(func)
+    def __init__(self, endpoint, method="GET", timeout=socket._GLOBAL_DEFAULT_TIMEOUT, response_class=None):
+        """
+        :param endpoint:
+            URL endpoint for request.
+        :param method:
+            HTTP method for request.
+        :param timeout:
+            Timeout in seconds.
+        :param response_class:
+            Response class to wrap response in. If not provided will use standard response from urlopen,
+            or standard HttpError if received.
+        """
+        self.endpoint = endpoint
+        self.method = method
+        self.timeout = timeout
+        self.response_class = response_class
+
+    def __call__(self, method):
+        """
+        Method being wrapped should only return data to be used for
+        API call. The api_request takes that data, urlencodes it and
+        makes the proper get or post request to the specified endpoint.
+        """
+
+        @wraps(method)
         def _inner(cls, *args, **kwargs):
             try:
-                url = cls.HOST_NAME + endpoint
-                func_data = func(cls, *args, **kwargs)
-                query_data = urlencode(func_data, doseq=1)
-                if method == "GET":
-                    url += "?" + query_data
-                    query_data = None
-
-                response = urllib2.urlopen(url, data=query_data, timeout=timeout)
+                method_data = method(cls, *args, **kwargs)
+                url, query_data = self._get_url_and_data(method_data, cls)
+                response = self._open_url(url, query_data)
             except urllib2.HTTPError as e:
                 response = e
+            return self.prepare_response(response, cls)
 
-            custom_response = response_class or getattr(cls, "RESPONSE_CLASS", None)
-            if custom_response:
-                return custom_response(response)
-            else:
-                return response
         return _inner
-    return _outter
+
+    def _get_url_and_data(self, method_data, cls):
+        """
+        Returns url and data ready to make request.
+
+        :param method_data:
+            The data returned from the wrapped method call
+        :param cls:
+            The API class object being decorated.
+        """
+        url = cls.HOST_NAME + self.endpoint
+        query_data = method_data and urlencode(method_data, doseq=1)
+        if self.method == "GET" and query_data:
+            url += "?" + query_data
+            query_data = None
+        return url, query_data
+
+    def _open_url(self, url, query_data):
+        return urllib2.urlopen(url, data=query_data, timeout=self.timeout)
+
+    def prepare_response(self, response, cls):
+        """
+        Prepares API response for final return.
+
+        :param response:
+            The raw response returned from ``urlopen``
+        :param cls:
+            The API class object being decorated.
+        """
+        custom_response = self.response_class or getattr(cls, "RESPONSE_CLASS", None)
+        if custom_response:
+            return custom_response(response)
+        else:
+            return response
+api_request = APIRequest
+
 
 
 
