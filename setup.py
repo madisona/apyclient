@@ -4,9 +4,11 @@ import os
 readme = os.path.join(os.path.dirname(__file__), 'README.rst')
 LONG_DESCRIPTION = open(readme, 'r').read()
 
+from apyclient import __version__
+
 params = dict(
     name='apyclient',
-    version='0.0.1',
+    version=__version__,
     url='https://github.com/madisona/apyclient',
     license='BSD',
     author='Aaron Madison',
@@ -14,6 +16,7 @@ params = dict(
     description='A Python Api Client',
     long_description=LONG_DESCRIPTION,
     py_modules=['apyclient'],
+    install_requires=['apysigner'],
 
     zip_safe=False,
     classifiers = [

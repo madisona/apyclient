@@ -11,7 +11,7 @@ Allows you to easily create client APIs in a highly customizable way.
 
 Installation
 ------------
-Only requirement is python 2.6 or greater. Tests require 'mock' package.
+Requires python >= 2.6 and apysigner. Tests require 'mock' package.
 
 ::
 
@@ -69,3 +69,17 @@ one argument on initialization, the original response.
         @api_request("/api-endpoint/", response_class=SpecializedResponseClass)
         def fetch_some_stuff(some_var):
             return {"the_variable": some_var}
+
+
+New addition: Signed Requests
+This was modeled after Google Maps signed request.
+When you have a situation where you want to secure an endpoint without login
+you can use the signed request.
+
+The concept is the API provider shares a client id and private key with the
+client applications. The client applications then "sign" their requests
+to the provider using the client id and private key. When the provider
+receives the request, it verifies that it can create the same signature
+using the given client id.
+
+Take a look at the django-request-signer python package for some more information.

@@ -11,6 +11,8 @@ import apyclient
 __all__ = (
     'BaseResponseTests',
     'ApiRequestTests',
+    'SignedAPIRequestTests',
+    'JSONApiResponseTests',
 )
 
 class CustomResponse(object):
@@ -32,12 +34,21 @@ class ResponseStub(object):
         return self.content
 
 
+class TestSignedRequest(apyclient.SignedAPIRequest):
+    CLIENT_ID = "client-test"
+    PRIVATE_KEY = "UHJpdmF0ZSBLZXk="
+test_signed_request = TestSignedRequest
+
 class ApiStub(object):
     HOST_NAME = "http://www.example.com"
 
     @apyclient.api_request("/do-something/", timeout=10)
     def do_something(self):
         return {'times': 5}
+
+    @apyclient.api_request("/do-simple/", timeout=10)
+    def do_simple(self):
+        pass
 
     @apyclient.api_request("/do-multiple/", timeout=3)
     def do_multiple(self):
@@ -123,6 +134,16 @@ class ApiRequestTests(TestCase):
         )
 
     @mock.patch("urllib2.urlopen")
+    def test_makes_correct_call_when_no_data_to_pass(self, urlopen):
+        api = ApiStub()
+        api.do_simple()
+
+        urlopen.assert_called_once_with("http://www.example.com/do-simple/",
+            data=None,
+            timeout=10,
+        )
+
+    @mock.patch("urllib2.urlopen")
     def test_returns_response_when_successful_response(self, urlopen):
         resp = urllib2.addinfourl(StringIO("mock_content"), "mock headers", url="http://www.example.com/", code="200")
         urlopen.return_value = resp
@@ -161,6 +182,72 @@ class ApiRequestTests(TestCase):
         self.assertEqual(resp, response._response)
 
 
+
+
+
+class SignedAPIRequestTests(TestCase):
+
+    def test_subclasses_api_request(self):
+        self.assertTrue(issubclass(apyclient.SignedAPIRequest, apyclient.APIRequest))
+
+    @mock.patch("apysigner.get_signature")
+    def test_adds_client_param_name_and_value_to_url_before_sending_to_get_signature(self, get_signature):
+        endpoint = "/do_this/"
+        url = endpoint + "?thing=clap"
+        sut = TestSignedRequest(endpoint)
+        sut._get_signed_url(url, None)
+
+        expected_url_to_sign = url + "&{0}={1}".format(sut.CLIENT_PARAM_NAME, sut.CLIENT_ID)
+        get_signature.assert_called_once_with(sut.PRIVATE_KEY, expected_url_to_sign, None)
+
+    @mock.patch("apysigner.get_signature")
+    def test_adds_client_info_when_no_existing_get_data(self, get_signature):
+        endpoint = "/do_this/"
+        sut = TestSignedRequest(endpoint)
+        sut._get_signed_url(endpoint, None)
+
+        expected_url_to_sign = endpoint + "?{0}={1}".format(sut.CLIENT_PARAM_NAME, sut.CLIENT_ID)
+        get_signature.assert_called_once_with(sut.PRIVATE_KEY, expected_url_to_sign, None)
+
+    @mock.patch("apysigner.get_signature")
+    def test_adds_client_info_when_post_request(self, get_signature):
+        endpoint = "/do_this/"
+        post_data = 'thing=clap'
+        sut = TestSignedRequest(endpoint)
+        sut._get_signed_url(endpoint, post_data)
+
+        expected_url_to_sign = endpoint + "?{0}={1}".format(sut.CLIENT_PARAM_NAME, sut.CLIENT_ID)
+        get_signature.assert_called_once_with(sut.PRIVATE_KEY, expected_url_to_sign, {'thing': ['clap']})
+
+    def test_returns_url_with_signature_attached(self):
+        endpoint = "/do_this/"
+        sut = TestSignedRequest(endpoint)
+
+        signed_url = sut._get_signed_url(endpoint, None)
+
+        expected_url = endpoint + "?{client}={client_id}&{sig}={signature}".format(
+            client=sut.CLIENT_PARAM_NAME,
+            client_id=sut.CLIENT_ID,
+            sig=sut.SIGNATURE_PARAM_NAME,
+            signature='IF5ygqTozyktR9dEWhf-DR9sICI1dyDEea6PMtuTRxA='
+        )
+        self.assertEqual(expected_url, signed_url)
+
+    @mock.patch("urllib2.urlopen")
+    def test_sends_signed_request_to_url_opener(self, urlopen):
+        endpoint = "/do_this/"
+        query_data = "thing=clap"
+        sut = TestSignedRequest(endpoint)
+
+        sut._open_url(endpoint, query_data)
+        expected_url = endpoint + "?{client}={client_id}&{sig}={signature}".format(
+            client=sut.CLIENT_PARAM_NAME,
+            client_id=sut.CLIENT_ID,
+            sig=sut.SIGNATURE_PARAM_NAME,
+            signature='K3oNp0dyUcIth1NfLthRpauBINDMo-ycddb-bcvpkJo='
+        )
+        urlopen.assert_called_once_with(expected_url, data=query_data, timeout=sut.timeout)
+
 class JSONApiResponseTests(TestCase):
 
     def get_data(self):
@@ -184,6 +271,8 @@ class JSONApiResponseTests(TestCase):
             two = response.json()
         self.assertEqual(two, one)
         self.assertEqual(1, load.call_count)
+
+
 
 
 if __name__ == '__main__':
