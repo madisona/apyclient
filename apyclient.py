@@ -23,6 +23,7 @@ from urlparse import parse_qs
 
 import apysigner
 
+
 class BaseResponse(object):
     """
     Thin wrapper around response that comes back from urlopen.
@@ -178,6 +179,65 @@ class SignedAPIRequest(APIRequest):
             param_name=self.CLIENT_PARAM_NAME,
             client_id=self.CLIENT_ID,
         )
+
+
+class BaseAPIClient(object):
+    """
+    It's not always convenient to wrap the class with a method to use for calling your api.
+    This class provides a little more extensible class to work with.
+
+    You must have a "HOST_NAME" defined on the class.
+
+    USAGE:
+
+      client = BaseClient()
+      response = client.fetch_response("/do-something", method="GET", times=5)
+
+    See tests for additional examples
+
+    """
+    HOST_NAME = None
+    RESPONSE_CLASS = None
+    TIMEOUT = socket._GLOBAL_DEFAULT_TIMEOUT
+
+    def _get_url_and_data(self, endpoint, method, data):
+        """
+        Returns url and data ready to make request.
+
+        :param endpoint:
+            A string of the url endpoint for the request.
+        :param method:
+            A string of the HTTP Method to use. (GET/POST)
+        :param data:
+            A dictionary of data to use with the request
+        """
+        url = self.HOST_NAME + endpoint
+        query_data = data and urlencode(data, doseq=1)
+        if method == "GET" and query_data:
+            url += "?" + query_data
+            query_data = None
+        return url, query_data
+
+    def _open_url(self, url, query_data):
+        return urllib2.urlopen(url, data=query_data, timeout=self.TIMEOUT)
+
+    def fetch_response(self, endpoint, method="GET", **data):
+        """
+        Main Method that fetches url.
+
+        :param endpoint:
+            The string value of url endpoint. It will get combined with the 'HOST_NAME' from the class
+        :param method:
+            A string of the HTTP method to use. Must be upper case.
+        :param **data:
+            keyword arguments for all data items to be used to make the request.
+        """
+        try:
+            url, query_data = self._get_url_and_data(endpoint, method, data or None)
+            response = self._open_url(url, query_data)
+        except urllib2.HTTPError as e:
+            response = e
+        return self.RESPONSE_CLASS and self.RESPONSE_CLASS(response) or response
 
 
 class JSONApiResponse(BaseResponse):

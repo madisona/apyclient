@@ -13,15 +13,19 @@ __all__ = (
     'ApiRequestTests',
     'SignedAPIRequestTests',
     'JSONApiResponseTests',
+    'BaseAPIClientTests',
 )
+
 
 class CustomResponse(object):
     def __init__(self, response):
         self._response = response
 
+
 class CustomResponseTwo(object):
     def __init__(self, response):
         self._response = response
+
 
 class ResponseStub(object):
 
@@ -38,6 +42,7 @@ class TestSignedRequest(apyclient.SignedAPIRequest):
     CLIENT_ID = "client-test"
     PRIVATE_KEY = "UHJpdmF0ZSBLZXk="
 test_signed_request = TestSignedRequest
+
 
 class ApiStub(object):
     HOST_NAME = "http://www.example.com"
@@ -182,9 +187,6 @@ class ApiRequestTests(TestCase):
         self.assertEqual(resp, response._response)
 
 
-
-
-
 class SignedAPIRequestTests(TestCase):
 
     def test_subclasses_api_request(self):
@@ -248,6 +250,7 @@ class SignedAPIRequestTests(TestCase):
         )
         urlopen.assert_called_once_with(expected_url, data=query_data, timeout=sut.timeout)
 
+
 class JSONApiResponseTests(TestCase):
 
     def get_data(self):
@@ -272,6 +275,89 @@ class JSONApiResponseTests(TestCase):
         self.assertEqual(two, one)
         self.assertEqual(1, load.call_count)
 
+
+class ClientStub(apyclient.BaseAPIClient):
+    HOST_NAME = "http://www.example.com"
+    TIMEOUT = 10
+
+    def do_something(self):
+        return self.fetch_response("/do-something/", times=5)
+
+    def do_multiple(self):
+        return self.fetch_response("/do-multiple/", times=[5, 3])
+
+    def do_post(self):
+        return self.fetch_response("/do-post/", method="POST", one_thing="this&that", other_thing="a/path")
+
+    def do_simple(self):
+        return self.fetch_response("/do-simple/")
+
+
+class CustomResponseClientStub(ClientStub):
+    RESPONSE_CLASS = apyclient.JSONApiResponse
+
+
+class BaseAPIClientTests(TestCase):
+
+    @mock.patch("urllib2.urlopen")
+    def test_calls_urlopen_with_full_get_url(self, urlopen):
+        api = ClientStub()
+        api.do_something()
+        urlopen.assert_called_once_with("http://www.example.com/do-something/?times=5", data=None, timeout=10)
+
+    @mock.patch("urllib2.urlopen")
+    def test_allows_sequence_for_data_args(self, urlopen):
+        api = ClientStub()
+        api.do_multiple()
+        urlopen.assert_called_once_with("http://www.example.com/do-multiple/?times=5&times=3", data=None, timeout=10)
+
+    @mock.patch("urllib2.urlopen")
+    def test_calls_urlopen_with_post_content(self, urlopen):
+        api = ClientStub()
+        api.do_post()
+
+        urlopen.assert_called_once_with("http://www.example.com/do-post/",
+            data="one_thing=this%26that&other_thing=a%2Fpath", # url encoded
+            timeout=10,
+        )
+
+    @mock.patch("urllib2.urlopen")
+    def test_makes_correct_call_when_no_data_to_pass(self, urlopen):
+        api = ClientStub()
+        api.do_simple()
+
+        urlopen.assert_called_once_with("http://www.example.com/do-simple/",
+            data=None,
+            timeout=10,
+        )
+
+    @mock.patch("urllib2.urlopen")
+    def test_returns_response_when_successful_response(self, urlopen):
+        resp = urllib2.addinfourl(StringIO("mock_content"), "mock headers", url="http://www.example.com/", code="200")
+        urlopen.return_value = resp
+
+        api_stub = ClientStub()
+        response = api_stub.do_something()
+        self.assertEqual(resp, response)
+
+    @mock.patch("urllib2.urlopen")
+    def test_returns_http_error(self, urlopen):
+        err = urllib2.HTTPError(url="http://www.example.com/", code="403", msg="Permission Denied", hdrs="mock headers", fp=StringIO("mock_content"))
+        urlopen.side_effect = err
+
+        api_stub = ClientStub()
+        response = api_stub.do_something()
+        self.assertEqual(err, response)
+
+    @mock.patch("urllib2.urlopen")
+    def test_returns_custom_response_class_when_declared_on_method(self, urlopen):
+        resp = urllib2.addinfourl(StringIO("mock_content"), "mock headers", url="http://www.example.com/", code="200")
+        urlopen.return_value = resp
+
+        api_stub = CustomResponseClientStub()
+        response = api_stub.do_simple()
+        self.assertIsInstance(response, apyclient.JSONApiResponse)
+        self.assertEqual(resp, response.original_response)
 
 
 
