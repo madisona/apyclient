@@ -77,8 +77,8 @@ class APIRequest(object):
         """
         self.endpoint = endpoint
         self.method = method
-        self.timeout = timeout
         self.response_class = response_class
+        self.TIMEOUT = timeout
 
     def __call__(self, method):
         """
@@ -116,7 +116,7 @@ class APIRequest(object):
         return url, query_data
 
     def _open_url(self, url, query_data):
-        return urllib2.urlopen(url, data=query_data, timeout=self.timeout)
+        return urllib2.urlopen(url, data=query_data, timeout=self.TIMEOUT)
 
     def prepare_response(self, response, cls):
         """
@@ -136,21 +136,7 @@ api_request = APIRequest
 
 
 
-class SignedAPIRequest(APIRequest):
-    """
-    Signs an API request.
-
-    You can subclass this and then use that as your decorator.
-    class MySignedAPI(SignedAPIRequest):
-        CLIENT_ID = "client-id"
-        PRIVATE_KEY = "UHJpdmF0ZSBLZXk="
-
-    signed_request = MySignedAPI
-
-    @signed_request('/something/good', method='POST')
-    def post_something():
-        return {'good_thing': 'babies'}
-    """
+class SignedURLMixin(object):
     CLIENT_PARAM_NAME = 'ClientId'
     SIGNATURE_PARAM_NAME = 'Signature'
 
@@ -162,7 +148,7 @@ class SignedAPIRequest(APIRequest):
         Don't sign until last step before opening url
         """
         url = self._get_signed_url(url, query_data)
-        return urllib2.urlopen(url, data=query_data, timeout=self.timeout)
+        return urllib2.urlopen(url, data=query_data, timeout=self.TIMEOUT)
 
     def _get_signed_url(self, url, query_data):
         # Currently limited to kinds of data that are key=value pairs.
@@ -179,6 +165,23 @@ class SignedAPIRequest(APIRequest):
             param_name=self.CLIENT_PARAM_NAME,
             client_id=self.CLIENT_ID,
         )
+
+
+class SignedAPIRequest(SignedURLMixin, APIRequest):
+    """
+    Signs an API request.
+
+    You can subclass this and then use that as your decorator.
+    class MySignedAPI(SignedAPIRequest):
+        CLIENT_ID = "client-id"
+        PRIVATE_KEY = "UHJpdmF0ZSBLZXk="
+
+    signed_request = MySignedAPI
+
+    @signed_request('/something/good', method='POST')
+    def post_something():
+        return {'good_thing': 'babies'}
+    """
 
 
 class BaseAPIClient(object):
@@ -240,6 +243,12 @@ class BaseAPIClient(object):
         return self.RESPONSE_CLASS and self.RESPONSE_CLASS(response) or response
 
 
+class BaseSignedAPIClient(SignedURLMixin, BaseAPIClient):
+    """
+    Base client that signs urls
+    """
+
+
 class JSONApiResponse(BaseResponse):
     """
     Loads JSON object from Response.
@@ -253,7 +262,3 @@ class JSONApiResponse(BaseResponse):
         if self._json is None:
             self._json = json.loads(self.content)
         return self._json
-
-
-
-
