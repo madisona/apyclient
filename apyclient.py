@@ -12,7 +12,7 @@ __all__ = (
     'JSONApiResponse',
 )
 
-__version__ = "0.0.2"
+__version__ = "0.1.0"
 
 from functools import wraps
 import json
