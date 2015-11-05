@@ -1,10 +1,18 @@
 #!/usr/bin/env python
 
-from cStringIO import StringIO
+import six
+from io import StringIO
 import json
 import mock
 from unittest import TestCase, main
-import urllib2
+
+if six.PY2:
+    from urllib2 import HTTPError
+    from urllib import addinfourl
+else:
+    from urllib.response import addinfourl
+    from urllib.error import HTTPError
+
 
 
 import apyclient
@@ -68,10 +76,10 @@ class ApiStub(object):
 
     @apyclient.api_request("/do-post/", method="POST", timeout=30)
     def do_post(self):
-        return {
-            'one_thing': "this&that",
-            'other_thing': "a/path"
-        }
+        return (
+            ('one_thing', "this&that"),
+            ('other_thing', "a/path"),
+        )
 
 
 class ApiCustomResponseStub(ApiStub):
@@ -123,19 +131,19 @@ class BaseResponseTests(TestCase):
 
 class ApiRequestTests(TestCase):
 
-    @mock.patch("urllib2.urlopen")
+    @mock.patch("apyclient.urlopen")
     def test_calls_urlopen_with_full_get_url(self, urlopen):
         api = ApiStub()
         api.do_something()
         urlopen.assert_called_once_with("http://www.example.com/do-something/?times=5", data=None, timeout=10)
 
-    @mock.patch("urllib2.urlopen")
+    @mock.patch("apyclient.urlopen")
     def test_allows_sequence_for_data_args(self, urlopen):
         api = ApiStub()
         api.do_multiple()
         urlopen.assert_called_once_with("http://www.example.com/do-multiple/?times=5&times=3", data=None, timeout=3)
 
-    @mock.patch("urllib2.urlopen")
+    @mock.patch("apyclient.urlopen")
     def test_calls_urlopen_with_post_content(self, urlopen):
         api = ApiStub()
         api.do_post()
@@ -145,7 +153,7 @@ class ApiRequestTests(TestCase):
             timeout=30,
         )
 
-    @mock.patch("urllib2.urlopen")
+    @mock.patch("apyclient.urlopen")
     def test_makes_correct_call_when_no_data_to_pass(self, urlopen):
         api = ApiStub()
         api.do_simple()
@@ -155,27 +163,26 @@ class ApiRequestTests(TestCase):
             timeout=10,
         )
 
-    @mock.patch("urllib2.urlopen")
+    @mock.patch("apyclient.urlopen")
     def test_returns_response_when_successful_response(self, urlopen):
-        resp = urllib2.addinfourl(StringIO("mock_content"), "mock headers", url="http://www.example.com/", code="200")
+        resp = addinfourl(StringIO(u"mock_content"), "mock headers", url="http://www.example.com/", code="200")
         urlopen.return_value = resp
 
         api_stub = ApiStub()
         response = api_stub.do_something()
         self.assertEqual(resp, response)
 
-    @mock.patch("urllib2.urlopen")
+    @mock.patch("apyclient.urlopen")
     def test_returns_http_error(self, urlopen):
-        err = urllib2.HTTPError(url="http://www.example.com/", code="403", msg="Permission Denied", hdrs="mock headers", fp=StringIO("mock_content"))
+        err = HTTPError(url="http://www.example.com/", code="403", msg="Permission Denied", hdrs="mock headers", fp=StringIO(u"mock_content"))
         urlopen.side_effect = err
-
         api_stub = ApiStub()
         response = api_stub.do_something()
         self.assertEqual(err, response)
 
-    @mock.patch("urllib2.urlopen")
+    @mock.patch("apyclient.urlopen")
     def test_returns_custom_response_class_when_declared_on_method(self, urlopen):
-        resp = urllib2.addinfourl(StringIO("mock_content"), "mock headers", url="http://www.example.com/", code="200")
+        resp = addinfourl(StringIO(u"mock_content"), "mock headers", url="http://www.example.com/", code="200")
         urlopen.return_value = resp
 
         api_stub = ApiCustomResponseStub()
@@ -183,9 +190,9 @@ class ApiRequestTests(TestCase):
         self.assertIsInstance(response, CustomResponse)
         self.assertEqual(resp, response._response)
 
-    @mock.patch("urllib2.urlopen")
+    @mock.patch("apyclient.urlopen")
     def test_returns_custom_response_class_when_declared_on_api_class(self, urlopen):
-        resp = urllib2.addinfourl(StringIO("mock_content"), "mock headers", url="http://www.example.com/", code="200")
+        resp = addinfourl(StringIO(u"mock_content"), "mock headers", url="http://www.example.com/", code="200")
         urlopen.return_value = resp
 
         api_stub = ApiCustomResponseStub()
@@ -238,11 +245,11 @@ class SignedAPIRequestTests(TestCase):
             client=sut.CLIENT_PARAM_NAME,
             client_id=sut.CLIENT_ID,
             sig=sut.SIGNATURE_PARAM_NAME,
-            signature='IF5ygqTozyktR9dEWhf-DR9sICI1dyDEea6PMtuTRxA='
+            signature='mY64pkQcE5FGiZY1YLtClR4pKrgYns1bS4Mu7AlzqNw='
         )
         self.assertEqual(expected_url, signed_url)
 
-    @mock.patch("urllib2.urlopen")
+    @mock.patch("apyclient.urlopen")
     def test_sends_signed_request_to_url_opener(self, urlopen):
         endpoint = "/do_this/"
         query_data = "thing=clap"
@@ -253,7 +260,7 @@ class SignedAPIRequestTests(TestCase):
             client=sut.CLIENT_PARAM_NAME,
             client_id=sut.CLIENT_ID,
             sig=sut.SIGNATURE_PARAM_NAME,
-            signature='K3oNp0dyUcIth1NfLthRpauBINDMo-ycddb-bcvpkJo='
+            signature='DCIhG1oBK2FXvE9wKMiUZhSjDElzdZZ1-7jZKfKLTT8='
         )
         urlopen.assert_called_once_with(expected_url, data=query_data, timeout=sut.TIMEOUT)
 
@@ -288,13 +295,17 @@ class ClientStub(apyclient.BaseAPIClient):
     TIMEOUT = 10
 
     def do_something(self):
-        return self.fetch_response("/do-something/", times=5)
+        return self.fetch_response("/do-something/", data={'times': 5})
 
     def do_multiple(self):
-        return self.fetch_response("/do-multiple/", times=[5, 3])
+        return self.fetch_response("/do-multiple/", data={'times': [5, 3]})
 
     def do_post(self):
-        return self.fetch_response("/do-post/", method="POST", one_thing="this&that", other_thing="a/path")
+        post_data = (
+            ('one_thing', 'this&that'),
+            ('other_thing', "a/path"),
+        )
+        return self.fetch_response("/do-post/", method="POST", data=post_data)
 
     def do_simple(self):
         return self.fetch_response("/do-simple/")
@@ -306,19 +317,19 @@ class CustomResponseClientStub(ClientStub):
 
 class BaseAPIClientTests(TestCase):
 
-    @mock.patch("urllib2.urlopen")
+    @mock.patch("apyclient.urlopen")
     def test_calls_urlopen_with_full_get_url(self, urlopen):
         api = ClientStub()
         api.do_something()
         urlopen.assert_called_once_with("http://www.example.com/do-something/?times=5", data=None, timeout=10)
 
-    @mock.patch("urllib2.urlopen")
+    @mock.patch("apyclient.urlopen")
     def test_allows_sequence_for_data_args(self, urlopen):
         api = ClientStub()
         api.do_multiple()
         urlopen.assert_called_once_with("http://www.example.com/do-multiple/?times=5&times=3", data=None, timeout=10)
 
-    @mock.patch("urllib2.urlopen")
+    @mock.patch("apyclient.urlopen")
     def test_calls_urlopen_with_post_content(self, urlopen):
         api = ClientStub()
         api.do_post()
@@ -328,7 +339,7 @@ class BaseAPIClientTests(TestCase):
             timeout=10,
         )
 
-    @mock.patch("urllib2.urlopen")
+    @mock.patch("apyclient.urlopen")
     def test_makes_correct_call_when_no_data_to_pass(self, urlopen):
         api = ClientStub()
         api.do_simple()
@@ -338,27 +349,27 @@ class BaseAPIClientTests(TestCase):
             timeout=10,
         )
 
-    @mock.patch("urllib2.urlopen")
+    @mock.patch("apyclient.urlopen")
     def test_returns_response_when_successful_response(self, urlopen):
-        resp = urllib2.addinfourl(StringIO("mock_content"), "mock headers", url="http://www.example.com/", code="200")
+        resp = addinfourl(StringIO(u"mock_content"), "mock headers", url="http://www.example.com/", code="200")
         urlopen.return_value = resp
 
         api_stub = ClientStub()
         response = api_stub.do_something()
         self.assertEqual(resp, response)
 
-    @mock.patch("urllib2.urlopen")
+    @mock.patch("apyclient.urlopen")
     def test_returns_http_error(self, urlopen):
-        err = urllib2.HTTPError(url="http://www.example.com/", code="403", msg="Permission Denied", hdrs="mock headers", fp=StringIO("mock_content"))
+        err = HTTPError(url="http://www.example.com/", code="403", msg="Permission Denied", hdrs="mock headers", fp=StringIO(u"mock_content"))
         urlopen.side_effect = err
 
         api_stub = ClientStub()
         response = api_stub.do_something()
         self.assertEqual(err, response)
 
-    @mock.patch("urllib2.urlopen")
+    @mock.patch("apyclient.urlopen")
     def test_returns_custom_response_class_when_declared_on_method(self, urlopen):
-        resp = urllib2.addinfourl(StringIO("mock_content"), "mock headers", url="http://www.example.com/", code="200")
+        resp = addinfourl(StringIO(u"mock_content"), "mock headers", url="http://www.example.com/", code="200")
         urlopen.return_value = resp
 
         api_stub = CustomResponseClientStub()
@@ -410,11 +421,11 @@ class BaseSignedAPIClientTests(TestCase):
             client=sut.CLIENT_PARAM_NAME,
             client_id=sut.CLIENT_ID,
             sig=sut.SIGNATURE_PARAM_NAME,
-            signature='IF5ygqTozyktR9dEWhf-DR9sICI1dyDEea6PMtuTRxA='
+            signature='mY64pkQcE5FGiZY1YLtClR4pKrgYns1bS4Mu7AlzqNw='
         )
         self.assertEqual(expected_url, signed_url)
     
-    @mock.patch("urllib2.urlopen")
+    @mock.patch("apyclient.urlopen")
     def test_sends_signed_request_to_url_opener(self, urlopen):
         endpoint = "/do_this/"
         query_data = "thing=clap"
@@ -425,7 +436,7 @@ class BaseSignedAPIClientTests(TestCase):
             client=sut.CLIENT_PARAM_NAME,
             client_id=sut.CLIENT_ID,
             sig=sut.SIGNATURE_PARAM_NAME,
-            signature='K3oNp0dyUcIth1NfLthRpauBINDMo-ycddb-bcvpkJo='
+            signature='DCIhG1oBK2FXvE9wKMiUZhSjDElzdZZ1-7jZKfKLTT8='
         )
         urlopen.assert_called_once_with(expected_url, data=query_data, timeout=sut.TIMEOUT)
 

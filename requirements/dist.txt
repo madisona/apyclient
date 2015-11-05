@@ -1,0 +1,2 @@
+six
+apysigner==3.0.1

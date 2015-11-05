@@ -12,14 +12,21 @@ __all__ = (
     'JSONApiResponse',
 )
 
-__version__ = "0.1.0"
 
 from functools import wraps
 import json
 import socket
-from urllib import urlencode
-import urllib2
-from urlparse import parse_qs
+import six
+
+if six.PY2:
+    from urllib import urlencode
+    from urllib2 import HTTPError, urlopen
+    from urlparse import parse_qs
+else:
+    from urllib.request import urlopen
+    from urllib.parse import parse_qs, urlencode
+    from urllib.error import HTTPError
+
 
 import apysigner
 
@@ -93,7 +100,7 @@ class APIRequest(object):
                 method_data = method(cls, *args, **kwargs)
                 url, query_data = self._get_url_and_data(method_data, cls)
                 response = self._open_url(url, query_data)
-            except urllib2.HTTPError as e:
+            except HTTPError as e:
                 response = e
             return self.prepare_response(response, cls)
 
@@ -116,7 +123,7 @@ class APIRequest(object):
         return url, query_data
 
     def _open_url(self, url, query_data):
-        return urllib2.urlopen(url, data=query_data, timeout=self.TIMEOUT)
+        return urlopen(url, data=query_data, timeout=self.TIMEOUT)
 
     def prepare_response(self, response, cls):
         """
@@ -148,7 +155,7 @@ class SignedURLMixin(object):
         Don't sign until last step before opening url
         """
         url = self._get_signed_url(url, query_data)
-        return urllib2.urlopen(url, data=query_data, timeout=self.TIMEOUT)
+        return urlopen(url, data=query_data, timeout=self.TIMEOUT)
 
     def _get_signed_url(self, url, query_data):
         # Currently limited to kinds of data that are key=value pairs.
@@ -222,9 +229,9 @@ class BaseAPIClient(object):
         return url, query_data
 
     def _open_url(self, url, query_data):
-        return urllib2.urlopen(url, data=query_data, timeout=self.TIMEOUT)
+        return urlopen(url, data=query_data, timeout=self.TIMEOUT)
 
-    def fetch_response(self, endpoint, method="GET", **data):
+    def fetch_response(self, endpoint, method="GET", data=None):
         """
         Main Method that fetches url.
 
@@ -238,7 +245,7 @@ class BaseAPIClient(object):
         try:
             url, query_data = self._get_url_and_data(endpoint, method, data or None)
             response = self._open_url(url, query_data)
-        except urllib2.HTTPError as e:
+        except HTTPError as e:
             response = e
         return self.RESPONSE_CLASS and self.RESPONSE_CLASS(response) or response
 
