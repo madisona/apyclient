@@ -6,25 +6,14 @@ import json
 import mock
 from unittest import TestCase, main
 
+import apyclient
+
 if six.PY2:
     from urllib2 import HTTPError
     from urllib import addinfourl
 else:
     from urllib.response import addinfourl
     from urllib.error import HTTPError
-
-
-
-import apyclient
-
-__all__ = (
-    'BaseResponseTests',
-    'ApiRequestTests',
-    'SignedAPIRequestTests',
-    'JSONApiResponseTests',
-    'BaseAPIClientTests',
-    'BaseSignedAPIClientTests',
-)
 
 
 class CustomResponse(object):
@@ -273,6 +262,13 @@ class JSONApiResponseTests(TestCase):
     def test_loads_json_from_content(self):
         data = self.get_data()
         raw = ResponseStub(code=200, content=json.dumps(data))
+        response = apyclient.JSONApiResponse(raw)
+
+        self.assertEqual(data, response.json())
+
+    def test_loads_json_from_content_when_response_is_bytes(self):
+        data = self.get_data()
+        raw = ResponseStub(code=200, content=bytes(json.dumps(data).encode("utf-8")))
         response = apyclient.JSONApiResponse(raw)
 
         self.assertEqual(data, response.json())

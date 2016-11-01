@@ -1,4 +1,5 @@
 -r dist.txt
 
-unittest2
+coverage
+flake8
 mock

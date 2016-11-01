@@ -3,6 +3,9 @@ apyclient
 
 A Python API Client
 
+.. image:: https://travis-ci.org/madisona/apyclient.svg?branch=py3_json_fix
+    :target: https://travis-ci.org/madisona/apyclient
+
 Overview
 --------
 

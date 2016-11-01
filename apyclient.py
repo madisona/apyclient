@@ -5,18 +5,12 @@
 # Released subject to the BSD License
 
 
-__all__ = (
-    'api_request',
-    'SignedAPIRequest',
-    'BaseResponse',
-    'JSONApiResponse',
-)
-
-
 from functools import wraps
 import json
 import socket
 import six
+
+import apysigner
 
 if six.PY2:
     from urllib import urlencode
@@ -28,7 +22,12 @@ else:
     from urllib.error import HTTPError
 
 
-import apysigner
+__all__ = (
+    'api_request',
+    'SignedAPIRequest',
+    'BaseResponse',
+    'JSONApiResponse',
+)
 
 
 class BaseResponse(object):
@@ -140,7 +139,6 @@ class APIRequest(object):
         else:
             return response
 api_request = APIRequest
-
 
 
 class SignedURLMixin(object):
@@ -267,5 +265,9 @@ class JSONApiResponse(BaseResponse):
 
     def json(self):
         if self._json is None:
-            self._json = json.loads(self.content)
+            content = self.content
+            if isinstance(content, bytes):
+                content = content.decode("utf-8")
+
+            self._json = json.loads(content)
         return self._json
