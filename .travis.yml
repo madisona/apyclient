@@ -7,6 +7,6 @@ install:
   - pip install -r requirements/test.txt
 script:
   - coverage erase
-  - coverage run test_apyclient.py
+  - coverage run test_apyclient.py --verbose
   - coverage report --show-missing
   - flake8 apyclient.py --max-line-length=120 --max-complexity=4
