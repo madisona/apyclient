@@ -265,5 +265,9 @@ class JSONApiResponse(BaseResponse):
 
     def json(self):
         if self._json is None:
-            self._json = json.loads(self.content)
+            content = self.content
+            if isinstance(content, bytes):
+                content = content.decode("utf-8")
+
+            self._json = json.loads(content)
         return self._json
