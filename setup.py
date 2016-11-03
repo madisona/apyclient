@@ -12,7 +12,7 @@ LONG_DESCRIPTION = open(readme, 'r').read()
 
 setup(
     name='apyclient',
-    version='0.3.0',
+    version='0.3.1',
     url='https://github.com/madisona/apyclient',
     license='BSD',
     author='Aaron Madison',

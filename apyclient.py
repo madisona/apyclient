@@ -227,6 +227,8 @@ class BaseAPIClient(object):
         return url, query_data
 
     def _open_url(self, url, query_data):
+        if query_data:
+            query_data = query_data.encode()
         return urlopen(url, data=query_data, timeout=self.TIMEOUT)
 
     def fetch_response(self, endpoint, method="GET", data=None):
