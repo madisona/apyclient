@@ -331,9 +331,16 @@ class BaseAPIClientTests(TestCase):
         api.do_post()
 
         urlopen.assert_called_once_with("http://www.example.com/do-post/",
-            data="one_thing=this%26that&other_thing=a%2Fpath", # url encoded
+            data=b"one_thing=this%26that&other_thing=a%2Fpath",  # url encoded byte string
             timeout=10,
         )
+
+    def test_encodes_post_payload(self):
+        # We expect to get a 404.
+        # The test blows up on Python3 when payload is not a byte string
+        api = ClientStub()
+        response = api.do_post()
+        self.assertEqual(404, response.code)
 
     @mock.patch("apyclient.urlopen")
     def test_makes_correct_call_when_no_data_to_pass(self, urlopen):
